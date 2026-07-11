@@ -1,0 +1,14 @@
+{
+  "id": "ShopCurator",
+  "name": "Shop Curator",
+  "display_name": "Curator",
+  "author": ["BaconRollz"],
+  "description": "Adds a config menu for selecting which cards, vouchers, and booster packs are available in the shop pool during a run.",
+  "prefix": "shopcurator",
+  "main_file": "main.lua",
+  "priority": 0,
+  "badge_colour": "3F6F6A",
+  "badge_text_colour": "FFFFFF",
+  "version": "0.4.0",
+  "dependencies": ["Steamodded (>=1.0.0~)"]
+}
