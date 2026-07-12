@@ -431,6 +431,72 @@ local function center_matches_create_type(center, _type)
 end
 
 local old_get_current_pool
+local VANILLA_JOKER_RARITIES = {
+    Common = 1,
+    Uncommon = 2,
+    Rare = 3,
+    Legendary = 4
+}
+
+local function joker_rarity_options()
+    local options, seen = {}, {}
+    local rarity_defs = SMODS
+        and SMODS.ObjectTypes
+        and SMODS.ObjectTypes.Joker
+        and SMODS.ObjectTypes.Joker.rarities
+
+    if type(rarity_defs) == "table" then
+        for _, rarity in ipairs(rarity_defs) do
+            local key = rarity.key
+            local value = VANILLA_JOKER_RARITIES[key] or key
+            local seen_key = tostring(value)
+            if value and not seen[seen_key] then
+                seen[seen_key] = true
+                options[#options + 1] = value
+            end
+        end
+    end
+
+    if #options == 0 then
+        options = { 1, 2, 3, 4 }
+    end
+
+    return options
+end
+
+local function unblocked_pool_entries(pool)
+    local available = {}
+    for _, key in ipairs(pool or {}) do
+        local center = G and G.P_CENTERS and G.P_CENTERS[key]
+        if key ~= "UNAVAILABLE" and center and not is_center_blocked(center) then
+            available[#available + 1] = key
+        end
+    end
+    return available
+end
+
+local function available_joker_rarity_options(_append)
+    local available = {}
+    for _, rarity in ipairs(joker_rarity_options()) do
+        local pool = old_get_current_pool("Joker", rarity, false, _append)
+        if #unblocked_pool_entries(pool) > 0 then
+            available[#available + 1] = rarity
+        end
+    end
+    return available
+end
+
+local function balanced_joker_rarity(_append)
+    local available = available_joker_rarity_options(_append)
+    if #available == 0 then
+        return nil
+    end
+
+    local ante = G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or 0
+    local seed = "shopcurator_joker_rarity_" .. tostring(ante) .. "_" .. tostring(_append or "")
+    local rarity = pseudorandom_element(available, pseudoseed(seed))
+    return rarity
+end
 
 local function build_available_fallback_pool(_type)
     local fallback = {}
@@ -440,7 +506,7 @@ local function build_available_fallback_pool(_type)
 
     local seen = {}
     if _type == "Joker" then
-        for rarity = 1, 4 do
+        for _, rarity in ipairs(joker_rarity_options()) do
             local pool = old_get_current_pool("Joker", rarity, rarity == 4, "shopcurator_fallback")
             for _, key in ipairs(pool) do
                 local center = G.P_CENTERS[key]
@@ -466,6 +532,15 @@ end
 
 old_get_current_pool = get_current_pool
 function get_current_pool(_type, _rarity, _legendary, _append)
+    if config.enabled
+        and ShopCurator.filter_depth > 0
+        and config.force_shop_cards
+        and _type == "Joker"
+        and not _rarity
+        and not _legendary then
+        _rarity = balanced_joker_rarity(_append)
+    end
+
     local pool, pool_key = old_get_current_pool(_type, _rarity, _legendary, _append)
     if not config.enabled or ShopCurator.filter_depth == 0 or not type_uses_curator_pool(_type) then
         return pool, pool_key
