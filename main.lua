@@ -9,6 +9,10 @@ config.force_boosters = config.force_boosters ~= false
 config.card_blocklist = config.card_blocklist or {}
 config.voucher_blocklist = config.voucher_blocklist or {}
 config.booster_blocklist = config.booster_blocklist or {}
+config.presets = config.presets or {}
+
+local BLOCKLIST_KEYS = { "card_blocklist", "voucher_blocklist", "booster_blocklist" }
+local PRESET_SLOTS = 3
 
 local ShopCurator = {
     categories = {
@@ -39,9 +43,12 @@ local ShopCurator = {
     rows_per_column = 8,
     columns = 2,
     filter_depth = 0,
+    preset_slot = 1,
     pools = {},
     rows = {},
     labels = {},
+    toggle_colours = {},
+    description_cache = {},
     pool_defs = {
         joker_common = {
             label = "Common Jokers",
@@ -120,9 +127,11 @@ for i = 1, ShopCurator.rows_per_column * ShopCurator.columns do
     }
     ShopCurator.rows[i] = {
         key = "",
+        number = "",
         name = "",
         set = "",
         selected = "",
+        colour = { 0, 0, 0, 1 },
         tooltip_lines = tooltip_lines,
         tooltip = {
             title = "Empty",
@@ -177,7 +186,84 @@ local function clean_loc_line(line)
     return line
 end
 
+local function collect_text(node, out)
+    if type(node) ~= "table" then
+        return
+    end
+    if node.config and type(node.config.text) == "string" then
+        out[#out + 1] = node.config.text
+    end
+    if type(node.nodes) == "table" then
+        for _, child in ipairs(node.nodes) do
+            collect_text(child, out)
+        end
+    end
+    if not node.n then
+        for _, child in ipairs(node) do
+            collect_text(child, out)
+        end
+    end
+end
+
+local function add_ui_lines(lines, ui_lines)
+    for _, line in ipairs(ui_lines or {}) do
+        if #lines >= 4 then
+            return
+        end
+        local parts = {}
+        collect_text(line, parts)
+        local text = table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+        if text ~= "" then
+            lines[#lines + 1] = text
+        end
+    end
+end
+
+-- Builds a temporary card, like the Collection screen does, so the tooltip
+-- shows real numbers ("+4 Mult") instead of placeholders. The run's random
+-- state is restored afterwards so opening the menu never changes a seed.
+local function live_description_lines(center)
+    if not (Card and G and G.P_CARDS and G.CARD_W and G.CARD_H) then
+        return nil
+    end
+
+    local saved_random = G.GAME and G.GAME.pseudorandom and copy_table and copy_table(G.GAME.pseudorandom)
+    local lines = {}
+    local card_ok, card = pcall(Card, 0, 0, G.CARD_W, G.CARD_H, G.P_CARDS.empty, center, {
+        bypass_discovery_center = true,
+        bypass_discovery_ui = true
+    })
+
+    if card_ok and card then
+        local ui_ok, ui = pcall(card.generate_UIBox_ability_table, card)
+        if ui_ok and type(ui) == "table" then
+            add_ui_lines(lines, ui.main)
+            for _, box in ipairs(type(ui.multi_box) == "table" and ui.multi_box or {}) do
+                add_ui_lines(lines, box)
+            end
+        end
+        pcall(card.remove, card)
+    end
+
+    if saved_random then
+        G.GAME.pseudorandom = saved_random
+    end
+
+    return #lines > 0 and lines or nil
+end
+
 local function description_lines(center)
+    if center and center.key then
+        local cached = ShopCurator.description_cache[center.key]
+        if cached == nil then
+            cached = live_description_lines(center) or false
+            ShopCurator.description_cache[center.key] = cached
+        end
+        if cached then
+            return cached
+        end
+    end
+
     local loc
     if G and G.localization and G.localization.descriptions and center then
         loc = G.localization.descriptions[center.set] and G.localization.descriptions[center.set][center.key]
@@ -186,6 +272,9 @@ local function description_lines(center)
 
     local text = loc and loc.text
     local lines = {}
+    if type(text) == "table" and type(text[1]) == "table" then
+        text = text[1]
+    end
     if type(text) == "table" then
         for _, line in ipairs(text) do
             local cleaned = clean_loc_line(line)
@@ -569,11 +658,70 @@ function get_current_pool(_type, _rarity, _legendary, _append)
     return pool, pool_key
 end
 
+local function set_colour(target, source)
+    for i = 1, 4 do
+        target[i] = source and source[i] or 1
+    end
+end
+
+local function state_colour(is_on, active)
+    if active == false then
+        return G.C.UI.BACKGROUND_INACTIVE
+    end
+    return is_on and G.C.GREEN or G.C.RED
+end
+
+local function toggle_colour(key)
+    ShopCurator.toggle_colours[key] = ShopCurator.toggle_colours[key] or { 0, 0, 0, 1 }
+    return ShopCurator.toggle_colours[key]
+end
+
 local function sync_toggles()
     ShopCurator.labels.enabled = config.enabled and "Enabled" or "Disabled"
     ShopCurator.labels.force_shop_cards = config.force_shop_cards and "On" or "Off"
     ShopCurator.labels.force_vouchers = config.force_vouchers and "On" or "Off"
     ShopCurator.labels.force_boosters = config.force_boosters and "On" or "Off"
+
+    set_colour(toggle_colour("enabled"), state_colour(config.enabled))
+    for _, key in ipairs({ "force_shop_cards", "force_vouchers", "force_boosters" }) do
+        set_colour(toggle_colour(key), state_colour(config[key], config.enabled))
+    end
+end
+
+local function preset_key(slot)
+    return "slot" .. tostring(slot)
+end
+
+local function preset_off_count(preset)
+    local count = 0
+    for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
+        for _, blocked in pairs(preset[blocklist_key] or {}) do
+            if blocked then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+local function sync_preset_label()
+    local slot = ShopCurator.preset_slot
+    local preset = config.presets[preset_key(slot)]
+    if preset then
+        ShopCurator.labels.preset = "Slot " .. slot .. ": " .. preset_off_count(preset) .. " off"
+    else
+        ShopCurator.labels.preset = "Slot " .. slot .. ": empty"
+    end
+end
+
+local function copy_blocklist(source)
+    local copy = {}
+    for key, blocked in pairs(source or {}) do
+        if blocked then
+            copy[key] = true
+        end
+    end
+    return copy
 end
 
 local function refresh_rows()
@@ -581,10 +729,11 @@ local function refresh_rows()
     local def = ShopCurator.pool_defs[pool_name]
     local pool = ensure_pool(pool_name)
     local page = math.min(ShopCurator.page[pool_name] or 1, max_page(pool_name))
+    local group_active = config.enabled and config[def.enabled_key]
     ShopCurator.page[pool_name] = page
 
     ShopCurator.labels.category = def.label
-    ShopCurator.labels.page = "Page " .. page .. "/" .. max_page(pool_name)
+    ShopCurator.labels.page = page .. "/" .. max_page(pool_name)
     ShopCurator.labels.selected = tostring(available_count(pool_name)) .. "/" .. tostring(#pool) .. " available"
 
     local start_index = (page - 1) * ShopCurator.rows_per_column * ShopCurator.columns
@@ -592,22 +741,28 @@ local function refresh_rows()
         local center = pool[start_index + i]
         local row = ShopCurator.rows[i]
         if center then
+            local blocklist = get_blocklist(pool_name)
+            local is_on = not blocklist[center.key]
             row.key = center.key
+            row.number = tostring(start_index + i)
             row.name = truncate(safe_name(center), 28)
             row.set = center.set == "Joker" and rarity_name(center.rarity) or (center.set or "")
-            local blocklist = get_blocklist(pool_name)
-            row.selected = blocklist[center.key] and "Off" or "On"
+            row.selected = is_on and "On" or "Off"
+            set_colour(row.colour, state_colour(is_on, group_active and true or false))
             set_tooltip(row, safe_name(center), description_lines(center))
         else
             row.key = ""
+            row.number = ""
             row.name = ""
             row.set = ""
             row.selected = ""
+            set_colour(row.colour, G.C.UI.BACKGROUND_INACTIVE)
             set_tooltip(row, "Empty", { "No card in this slot." })
         end
     end
 
     sync_toggles()
+    sync_preset_label()
 end
 
 G.FUNCS.shopcurator_toggle = function(e)
@@ -655,6 +810,33 @@ G.FUNCS.shopcurator_bulk = function(e)
         end
     end
 
+    refresh_rows()
+    save_config()
+end
+
+G.FUNCS.shopcurator_preset_slot = function(e)
+    ShopCurator.preset_slot = ((ShopCurator.preset_slot + e.config.step - 1) % PRESET_SLOTS) + 1
+    sync_preset_label()
+end
+
+G.FUNCS.shopcurator_preset_save = function(e)
+    local preset = {}
+    for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
+        preset[blocklist_key] = copy_blocklist(config[blocklist_key])
+    end
+    config.presets[preset_key(ShopCurator.preset_slot)] = preset
+    sync_preset_label()
+    save_config()
+end
+
+G.FUNCS.shopcurator_preset_load = function(e)
+    local preset = config.presets[preset_key(ShopCurator.preset_slot)]
+    if not preset then
+        return
+    end
+    for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
+        config[blocklist_key] = copy_blocklist(preset[blocklist_key])
+    end
     refresh_rows()
     save_config()
 end
@@ -725,7 +907,7 @@ local function toggle_row(label, key)
                     r = 0.08,
                     hover = true,
                     shadow = true,
-                    colour = G.C.BLUE,
+                    colour = toggle_colour(key),
                     button = "shopcurator_toggle",
                     config_key = key
                 },
@@ -743,8 +925,8 @@ local function item_row(i)
         nodes = {
             {
                 n = G.UIT.C,
-                config = { align = "cr", minw = 0.28 },
-                nodes = { text_node(tostring(i), 0.24, G.C.UI.TEXT_INACTIVE) }
+                config = { align = "cr", minw = 0.4 },
+                nodes = { ref_text_node(row, "number", 0.22, G.C.UI.TEXT_INACTIVE) }
             },
             {
                 n = G.UIT.C,
@@ -756,7 +938,7 @@ local function item_row(i)
                     r = 0.08,
                     hover = true,
                     shadow = true,
-                    colour = G.C.BLUE,
+                    colour = row.colour,
                     button = "shopcurator_toggle_item",
                     row = i,
                     tooltip = row.tooltip
@@ -780,7 +962,7 @@ local function item_row(i)
                 n = G.UIT.C,
                 config = {
                     align = "cl",
-                    minw = 3.45,
+                    minw = 3.33,
                     minh = 0.29,
                     padding = 0.03,
                     r = 0.05,
@@ -833,6 +1015,7 @@ end
 MOD.config_tab = function()
     migrate_old_slots()
     ShopCurator.pools = {}
+    ShopCurator.description_cache = {}
     for _, pool_name in ipairs(ShopCurator.categories) do
         ensure_pool(pool_name)
     end
@@ -880,6 +1063,8 @@ MOD.config_tab = function()
                         n = G.UIT.R,
                         config = { align = "cm", padding = 0.03 },
                         nodes = {
+                            text_node("Category", 0.22, G.C.UI.TEXT_INACTIVE),
+                            { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
                             button_node("<", "shopcurator_category", { step = -1 }, 0.45),
                             {
                                 n = G.UIT.C,
@@ -887,11 +1072,13 @@ MOD.config_tab = function()
                                 nodes = { ref_text_node(ShopCurator.labels, "category", 0.32, G.C.ORANGE) }
                             },
                             button_node(">", "shopcurator_category", { step = 1 }, 0.45),
-                            { n = G.UIT.B, config = { w = 0.2, h = 0.1 } },
+                            { n = G.UIT.B, config = { w = 0.25, h = 0.1 } },
+                            text_node("Page", 0.22, G.C.UI.TEXT_INACTIVE),
+                            { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
                             button_node("<", "shopcurator_page", { step = -1 }, 0.45),
                             {
                                 n = G.UIT.C,
-                                config = { align = "cm", minw = 1.5 },
+                                config = { align = "cm", minw = 0.9 },
                                 nodes = { ref_text_node(ShopCurator.labels, "page", 0.28) }
                             },
                             button_node(">", "shopcurator_page", { step = 1 }, 0.45),
@@ -906,9 +1093,23 @@ MOD.config_tab = function()
                         n = G.UIT.R,
                         config = { align = "cm", padding = 0.03 },
                         nodes = {
-                            button_node("All On", "shopcurator_bulk", { available = true }, 1.05),
+                            button_node("All On", "shopcurator_bulk", { available = true, colour = G.C.GREEN }, 1.05),
                             { n = G.UIT.B, config = { w = 0.12, h = 0.1 } },
-                            button_node("All Off", "shopcurator_bulk", { available = false }, 1.05)
+                            button_node("All Off", "shopcurator_bulk", { available = false }, 1.05),
+                            { n = G.UIT.B, config = { w = 0.6, h = 0.1 } },
+                            text_node("Preset", 0.22, G.C.UI.TEXT_INACTIVE),
+                            { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
+                            button_node("<", "shopcurator_preset_slot", { step = -1 }, 0.45),
+                            {
+                                n = G.UIT.C,
+                                config = { align = "cm", minw = 2.0 },
+                                nodes = { ref_text_node(ShopCurator.labels, "preset", 0.24) }
+                            },
+                            button_node(">", "shopcurator_preset_slot", { step = 1 }, 0.45),
+                            { n = G.UIT.B, config = { w = 0.12, h = 0.1 } },
+                            button_node("Save", "shopcurator_preset_save", { colour = G.C.BLUE }, 0.8),
+                            { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
+                            button_node("Load", "shopcurator_preset_load", { colour = G.C.BLUE }, 0.8)
                         }
                     },
                     {
