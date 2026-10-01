@@ -5,5 +5,6 @@ return {
     force_boosters = true,
     card_blocklist = {},
     voucher_blocklist = {},
-    booster_blocklist = {}
+    booster_blocklist = {},
+    presets = {}
 }

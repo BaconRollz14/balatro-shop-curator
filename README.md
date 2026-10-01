@@ -18,7 +18,9 @@ The mod keeps Balatro's normal shop randomness, but filters out anything you hav
   - Other Jokers
 - Separate categories for Tarot, Planet, Spectral, Vouchers, and Boosters
 - Two-column paged list for easier browsing
-- Hover tooltips for card descriptions when localization data is available
+- Green `On` and red `Off` buttons, so you can see at a glance what is allowed
+- Three preset slots to save and load your favourite set-ups
+- Hover tooltips with each card's real description, including its numbers
 
 ## Requirements
 
@@ -57,10 +59,20 @@ Use the page arrows to browse through each group.
 
 Each item has an `On` or `Off` button:
 
-- `On` means the item is allowed to appear.
-- `Off` means the item is filtered out of the shop or pack pool.
+- `On` (green) means the item is allowed to appear.
+- `Off` (red) means the item is filtered out of the shop or pack pool.
+- Grey buttons mean that whole group (Shop cards, Vouchers or Boosters) is switched off at the top, so your choices are saved but not currently applied.
 
 The `All On` and `All Off` buttons apply to the currently visible category, not every category at once.
+
+### Presets
+
+Use the `Preset` arrows to pick slot 1, 2 or 3.
+
+- `Save` stores every category's On/Off choices in that slot, replacing whatever was there.
+- `Load` replaces your current choices with the ones saved in that slot.
+
+The slot label shows how many items that preset turns off.
 
 ## What It Affects
 
@@ -90,7 +102,7 @@ For best results, leave at least one item enabled in each category you expect th
 
 ## Version
 
-Current version: `0.4.2`
+Current version: `0.5.0`
 
 ## Author
 
