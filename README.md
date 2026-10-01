@@ -76,6 +76,12 @@ Shop Curator can filter:
 
 The mod is designed to affect shop and booster-pack availability, not every card-generating effect in the game.
 
+## Joker Odds
+
+While the mod is enabled and `Shop cards` is `On`, shop and Buffoon pack Jokers are picked from one combined pool of every enabled Joker. Each enabled Joker has the same chance of appearing, whatever its rarity. For example, with 1 Uncommon and 99 Rare Jokers enabled, each one has a 1 in 100 chance.
+
+This replaces Balatro's normal rarity odds (roughly 70% Common, 25% Uncommon, 5% Rare), so Rare Jokers turn up more often than usual. Legendary Jokers still only come from The Soul, as in the base game.
+
 ## Fallback Behavior
 
 Balatro expects some generated pools to always produce a valid item. If every possible item for a required generated type is turned `Off`, the game may use a last-resort default instead of leaving the shop or pack empty.
@@ -84,7 +90,7 @@ For best results, leave at least one item enabled in each category you expect th
 
 ## Version
 
-Current version: `0.4.0`
+Current version: `0.4.2`
 
 ## Author
 
