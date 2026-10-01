@@ -80,7 +80,7 @@ The mod is designed to affect shop and booster-pack availability, not every card
 
 While the mod is enabled and `Shop cards` is `On`, shop and Buffoon pack Jokers are picked from one combined pool of every enabled Joker. Each enabled Joker has the same chance of appearing, whatever its rarity. For example, with 1 Uncommon and 99 Rare Jokers enabled, each one has a 1 in 100 chance.
 
-This replaces Balatro's normal rarity odds (roughly 70% Common, 25% Uncommon, 5% Rare), so Rare Jokers turn up more often than usual. Legendary Jokers still only come from The Soul, as in the base game.
+This replaces Balatro's normal rarity odds (roughly 70% Common, 25% Uncommon, 5% Rare), so Rare Jokers turn up more often than usual. Legendary Jokers are included in the pool too, so they can appear in the shop and Buffoon packs. Turn them `Off` in the Legendary Jokers category to keep them out.
 
 ## Fallback Behavior
 

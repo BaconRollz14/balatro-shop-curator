@@ -432,8 +432,8 @@ end
 
 local old_get_current_pool
 
--- Rarities that can normally appear in the shop (weight above zero).
--- Legendary has a weight of 0, so it stays limited to The Soul as in vanilla.
+-- Rarities that can normally appear in the shop (weight above zero), plus
+-- Legendary, which the base game keeps out of the shop.
 -- Rarity keys are passed as strings because Steamodded reads a number as a
 -- random roll (any whole number becomes Rare).
 local function shop_joker_rarities()
@@ -452,14 +452,14 @@ local function shop_joker_rarities()
                 end
             end
             local mod = G and G.GAME and G.GAME[tostring(rarity.key):lower() .. "_mod"] or 1
-            if rarity.key and weight * mod > 0 then
+            if rarity.key and (weight * mod > 0 or rarity.key == "Legendary") then
                 rarities[#rarities + 1] = rarity.key
             end
         end
     end
 
     if #rarities == 0 then
-        rarities = { "Common", "Uncommon", "Rare" }
+        rarities = { "Common", "Uncommon", "Rare", "Legendary" }
     end
 
     return rarities
@@ -486,7 +486,7 @@ local function flat_joker_pool()
     end
 
     for _, rarity in ipairs(shop_joker_rarities()) do
-        local rarity_pool = old_get_current_pool("Joker", rarity, false, "shopcurator_flat")
+        local rarity_pool = old_get_current_pool("Joker", rarity, rarity == "Legendary", "shopcurator_flat")
         for _, key in ipairs(unblocked_pool_entries(rarity_pool)) do
             if not seen[key] then
                 seen[key] = true
