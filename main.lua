@@ -704,10 +704,41 @@ local function preset_off_count(preset)
     return count
 end
 
+-- Ready-made presets, listed after the saved slots. They are built from the
+-- current Joker lists when loaded, so modded Jokers are covered too, and
+-- they can't be saved over.
+local BUILTIN_PRESETS = {
+    { label = "Everything On", block = {} },
+    { label = "No Commons", block = { "joker_common" } },
+    { label = "Rare & Legendary", block = { "joker_common", "joker_uncommon" } },
+    { label = "Legendary Party", block = { "joker_common", "joker_uncommon", "joker_rare" } }
+}
+
+local function builtin_preset(slot)
+    return BUILTIN_PRESETS[slot - PRESET_SLOTS]
+end
+
+local function builtin_blocklists(def)
+    local lists = {}
+    for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
+        lists[blocklist_key] = {}
+    end
+    for _, pool_name in ipairs(def.block) do
+        local blocklist_key = ShopCurator.pool_defs[pool_name].blocklist
+        for _, center in ipairs(ensure_pool(pool_name)) do
+            lists[blocklist_key][center.key] = true
+        end
+    end
+    return lists
+end
+
 local function sync_preset_label()
     local slot = ShopCurator.preset_slot
+    local builtin = builtin_preset(slot)
     local preset = config.presets[preset_key(slot)]
-    if preset then
+    if builtin then
+        ShopCurator.labels.preset = builtin.label
+    elseif preset then
         ShopCurator.labels.preset = "Slot " .. slot .. ": " .. preset_off_count(preset) .. " off"
     else
         ShopCurator.labels.preset = "Slot " .. slot .. ": empty"
@@ -815,11 +846,15 @@ G.FUNCS.shopcurator_bulk = function(e)
 end
 
 G.FUNCS.shopcurator_preset_slot = function(e)
-    ShopCurator.preset_slot = ((ShopCurator.preset_slot + e.config.step - 1) % PRESET_SLOTS) + 1
+    local total = PRESET_SLOTS + #BUILTIN_PRESETS
+    ShopCurator.preset_slot = ((ShopCurator.preset_slot + e.config.step - 1) % total) + 1
     sync_preset_label()
 end
 
 G.FUNCS.shopcurator_preset_save = function(e)
+    if builtin_preset(ShopCurator.preset_slot) then
+        return
+    end
     local preset = {}
     for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
         preset[blocklist_key] = copy_blocklist(config[blocklist_key])
@@ -830,7 +865,8 @@ G.FUNCS.shopcurator_preset_save = function(e)
 end
 
 G.FUNCS.shopcurator_preset_load = function(e)
-    local preset = config.presets[preset_key(ShopCurator.preset_slot)]
+    local builtin = builtin_preset(ShopCurator.preset_slot)
+    local preset = builtin and builtin_blocklists(builtin) or config.presets[preset_key(ShopCurator.preset_slot)]
     if not preset then
         return
     end
@@ -921,20 +957,20 @@ local function item_row(i)
     local row = ShopCurator.rows[i]
     return {
         n = G.UIT.R,
-        config = { align = "cm", padding = 0.015 },
+        config = { align = "cm", padding = 0.02 },
         nodes = {
             {
                 n = G.UIT.C,
-                config = { align = "cr", minw = 0.4 },
-                nodes = { ref_text_node(row, "number", 0.22, G.C.UI.TEXT_INACTIVE) }
+                config = { align = "cr", minw = 0.6, padding = 0.04 },
+                nodes = { ref_text_node(row, "number", 0.3, G.C.UI.TEXT_INACTIVE) }
             },
             {
                 n = G.UIT.C,
                 config = {
                     align = "cm",
-                    minw = 0.75,
-                    minh = 0.29,
-                    padding = 0.03,
+                    minw = 1.0,
+                    minh = 0.42,
+                    padding = 0.04,
                     r = 0.08,
                     hover = true,
                     shadow = true,
@@ -943,33 +979,33 @@ local function item_row(i)
                     row = i,
                     tooltip = row.tooltip
                 },
-                nodes = { ref_text_node(row, "selected", 0.23) }
+                nodes = { ref_text_node(row, "selected", 0.32) }
             },
             {
                 n = G.UIT.C,
                 config = {
                     align = "cm",
-                    minw = 0.85,
-                    minh = 0.29,
-                    padding = 0.03,
+                    minw = 1.25,
+                    minh = 0.42,
+                    padding = 0.04,
                     r = 0.05,
                     colour = G.C.UI.BACKGROUND_INACTIVE,
                     tooltip = row.tooltip
                 },
-                nodes = { ref_text_node(row, "set", 0.21, G.C.UI.TEXT_LIGHT) }
+                nodes = { ref_text_node(row, "set", 0.29, G.C.UI.TEXT_LIGHT) }
             },
             {
                 n = G.UIT.C,
                 config = {
                     align = "cl",
-                    minw = 3.33,
-                    minh = 0.29,
-                    padding = 0.03,
+                    minw = 4.4,
+                    minh = 0.42,
+                    padding = 0.04,
                     r = 0.05,
                     colour = G.C.WHITE,
                     tooltip = row.tooltip
                 },
-                nodes = { ref_text_node(row, "name", 0.24, G.C.UI.TEXT_DARK) }
+                nodes = { ref_text_node(row, "name", 0.33, G.C.UI.TEXT_DARK) }
             }
         }
     }
@@ -983,7 +1019,7 @@ local function list_column(column)
     end
     return {
         n = G.UIT.C,
-        config = { align = "tm", padding = 0.035, minw = 5.45 },
+        config = { align = "tm", padding = 0.05, minw = 7.5 },
         nodes = rows
     }
 end
@@ -1102,7 +1138,7 @@ MOD.config_tab = function()
                             button_node("<", "shopcurator_preset_slot", { step = -1 }, 0.45),
                             {
                                 n = G.UIT.C,
-                                config = { align = "cm", minw = 2.0 },
+                                config = { align = "cm", minw = 2.6 },
                                 nodes = { ref_text_node(ShopCurator.labels, "preset", 0.24) }
                             },
                             button_node(">", "shopcurator_preset_slot", { step = 1 }, 0.45),

@@ -19,7 +19,7 @@ The mod keeps Balatro's normal shop randomness, but filters out anything you hav
 - Separate categories for Tarot, Planet, Spectral, Vouchers, and Boosters
 - Two-column paged list for easier browsing
 - Green `On` and red `Off` buttons, so you can see at a glance what is allowed
-- Three preset slots to save and load your favourite set-ups
+- Three preset slots to save and load your favourite set-ups, plus four ready-made presets
 - Hover tooltips with each card's real description, including its numbers
 
 ## Requirements
@@ -67,12 +67,21 @@ The `All On` and `All Off` buttons apply to the currently visible category, not 
 
 ### Presets
 
-Use the `Preset` arrows to pick slot 1, 2 or 3.
+Use the `Preset` arrows to pick slot 1, 2 or 3, or one of the ready-made presets.
 
 - `Save` stores every category's On/Off choices in that slot, replacing whatever was there.
 - `Load` replaces your current choices with the ones saved in that slot.
 
 The slot label shows how many items that preset turns off.
+
+Ready-made presets can be loaded but not saved over:
+
+- `Everything On`: turns every item back on.
+- `No Commons`: turns off all Common Jokers.
+- `Rare & Legendary`: turns off all Common and Uncommon Jokers.
+- `Legendary Party`: turns off all Common, Uncommon and Rare Jokers, so only Legendaries (and any modded rarities) appear.
+
+Loading a ready-made preset replaces your current choices in every category.
 
 ## What It Affects
 
@@ -102,7 +111,7 @@ For best results, leave at least one item enabled in each category you expect th
 
 ## Version
 
-Current version: `0.5.0`
+Current version: `0.5.1`
 
 ## Author
 
