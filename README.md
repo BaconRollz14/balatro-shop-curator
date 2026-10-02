@@ -19,7 +19,7 @@ The mod keeps Balatro's normal shop randomness, but filters out anything you hav
 - Separate categories for Tarot, Planet, Spectral, Vouchers, and Boosters
 - Two-column paged list for easier browsing
 - Green `On` and red `Off` buttons, so you can see at a glance what is allowed
-- Three preset slots to save and load your favourite set-ups
+- Three preset slots to save and load your favourite set-ups, plus 13 ready-made presets
 - Hover tooltips with each card's real description, including its numbers
 
 ## Requirements
@@ -67,12 +67,30 @@ The `All On` and `All Off` buttons apply to the currently visible category, not 
 
 ### Presets
 
-Use the `Preset` arrows to pick slot 1, 2 or 3.
+**My presets** (slots 1–3): use the arrows to pick a slot.
 
 - `Save` stores every category's On/Off choices in that slot, replacing whatever was there.
 - `Load` replaces your current choices with the ones saved in that slot.
 
 The slot label shows how many items that preset turns off.
+
+**Ready-made** presets have their own row and can only be loaded, not saved over. Loading one replaces your current choices in every category, so save to a slot first if you want to keep them.
+
+- `Everything On`: turns every item back on.
+- `No Commons`: turns off all Common Jokers.
+- `Rare & Legendary`: turns off all Common and Uncommon Jokers.
+- `Legendary Party`: turns off all Common, Uncommon and Rare Jokers.
+- `Best Only`: turns off the Jokers and vouchers usually rated weakest (a judgement call).
+- `Money Maker`: only money-making Jokers.
+- `Mult Mayhem`: only Jokers that add or multiply Mult.
+- `Chip Stacker`: only Jokers that add Chips.
+- `Showman's Circus`: only copying and retriggering Jokers (Blueprint, Brainstorm, Showman, Hack and friends).
+- `Safe Spectrals`: turns off Spectral cards that destroy cards, Jokers, money or hand size.
+- `Mega Packs Only`: turns off normal-size booster packs, leaving Jumbo and Mega.
+- `Buffoon Bonanza`: only Buffoon (Joker) packs.
+- `Vanilla Only`: turns off everything added by other mods.
+
+Themed Joker presets include modded Jokers only when your Steamodded version tags them with a matching type. Small themed pools can run dry once you own every Joker in them; the shop then shows a plain Joker instead.
 
 ## What It Affects
 
@@ -102,7 +120,7 @@ For best results, leave at least one item enabled in each category you expect th
 
 ## Version
 
-Current version: `0.5.0`
+Current version: `0.6.0`
 
 ## Author
 

@@ -44,6 +44,7 @@ local ShopCurator = {
     columns = 2,
     filter_depth = 0,
     preset_slot = 1,
+    builtin_index = 1,
     pools = {},
     rows = {},
     labels = {},
@@ -704,6 +705,166 @@ local function preset_off_count(preset)
     return count
 end
 
+-- Ready-made presets. Each one decides, card by card, what to turn off, so
+-- they are built from the current card lists when loaded and can't be saved
+-- over. Base-game cards are listed by key; modded Jokers are picked up
+-- through Steamodded's attribute tags where the installed version has them.
+local function key_set(...)
+    local set = {}
+    for _, list in ipairs({ ... }) do
+        for _, key in ipairs(list) do
+            set[key] = true
+        end
+    end
+    return set
+end
+
+local function has_any_attribute(center, attributes)
+    if not (SMODS and type(SMODS.has_attribute) == "function") then
+        return false
+    end
+    for _, attribute in ipairs(attributes or {}) do
+        local ok, result = pcall(SMODS.has_attribute, center, attribute)
+        if ok and result then
+            return true
+        end
+    end
+    return false
+end
+
+local function is_joker_pool(pool_name)
+    return pool_name:sub(1, 6) == "joker_"
+end
+
+local function block_nothing()
+    return false
+end
+
+local function block_pools(pool_names)
+    local set = key_set(pool_names)
+    return function(_, pool_name)
+        return set[pool_name] == true
+    end
+end
+
+local function block_keys(...)
+    local set = key_set(...)
+    return function(center)
+        return set[center.key] == true
+    end
+end
+
+local function only_jokers(keys, attributes)
+    local set = key_set(keys)
+    return function(center, pool_name)
+        return is_joker_pool(pool_name) and not set[center.key] and not has_any_attribute(center, attributes)
+    end
+end
+
+local ECONOMY_JOKERS = {
+    "j_credit_card", "j_chaos", "j_delayed_grat", "j_business", "j_egg",
+    "j_faceless", "j_todo_list", "j_cloud_9", "j_rocket", "j_gift",
+    "j_reserved_parking", "j_mail", "j_to_the_moon", "j_golden",
+    "j_trading", "j_ticket", "j_rough_gem", "j_matador", "j_satellite", "j_astronomer"
+}
+
+local MULT_JOKERS = {
+    "j_joker", "j_greedy_joker", "j_lusty_joker", "j_wrathful_joker", "j_gluttenous_joker",
+    "j_jolly", "j_zany", "j_crazy", "j_mad", "j_droll",
+    "j_half", "j_ceremonial", "j_mystic_summit", "j_misprint", "j_raised_fist",
+    "j_fibonacci", "j_abstract", "j_gros_michel", "j_even_steven", "j_scholar", "j_supernova",
+    "j_ride_the_bus", "j_green_joker", "j_red_card", "j_erosion", "j_fortune_teller",
+    "j_flash", "j_popcorn", "j_trousers", "j_walkie_talkie", "j_smiley",
+    "j_swashbuckler", "j_onyx_agate", "j_shoot_the_moon", "j_bootstraps",
+    "j_stencil", "j_loyalty_card", "j_steel_joker", "j_blackboard", "j_constellation",
+    "j_cavendish", "j_card_sharp", "j_madness", "j_vampire", "j_hologram",
+    "j_baron", "j_obelisk", "j_photograph", "j_lucky_cat", "j_baseball",
+    "j_ancient", "j_ramen", "j_campfire", "j_acrobat", "j_throwback",
+    "j_bloodstone", "j_glass", "j_flower_pot", "j_idol", "j_seeing_double",
+    "j_hit_the_road", "j_duo", "j_trio", "j_family", "j_order", "j_tribe",
+    "j_drivers_license", "j_caino", "j_triboulet", "j_yorick"
+}
+
+local CHIP_JOKERS = {
+    "j_sly", "j_wily", "j_clever", "j_devious", "j_crafty",
+    "j_banner", "j_scary_face", "j_odd_todd", "j_scholar", "j_runner",
+    "j_ice_cream", "j_blue_joker", "j_hiker", "j_square", "j_stone",
+    "j_bull", "j_walkie_talkie", "j_castle", "j_arrowhead", "j_wee",
+    "j_stuntman"
+}
+
+local COPY_JOKERS = {
+    "j_blueprint", "j_brainstorm", "j_ring_master", "j_invisible", "j_dna", "j_perkeo",
+    "j_mime", "j_dusk", "j_hack", "j_selzer", "j_sock_and_buskin", "j_hanging_chad"
+}
+
+-- A judgement call: Jokers and vouchers that tier lists usually rank lowest.
+-- Voucher upgrades are listed with their base so neither is left stranded.
+local WEAK_JOKERS = {
+    "j_credit_card", "j_juggler", "j_drunkard", "j_troubadour", "j_ticket",
+    "j_faceless", "j_hallucination", "j_superposition", "j_seance", "j_matador",
+    "j_merry_andy", "j_8_ball", "j_mail"
+}
+
+local WEAK_VOUCHERS = {
+    "v_magic_trick", "v_illusion", "v_tarot_merchant", "v_tarot_tycoon"
+}
+
+local RISKY_SPECTRALS = {
+    "c_familiar", "c_grim", "c_incantation", "c_wraith", "c_ouija",
+    "c_ectoplasm", "c_immolate", "c_ankh", "c_hex"
+}
+
+local BUILTIN_PRESETS = {
+    { label = "Everything On", blocks = block_nothing },
+    { label = "No Commons", blocks = block_pools({ "joker_common" }) },
+    { label = "Rare & Legendary", blocks = block_pools({ "joker_common", "joker_uncommon" }) },
+    { label = "Legendary Party", blocks = block_pools({ "joker_common", "joker_uncommon", "joker_rare" }) },
+    { label = "Best Only", blocks = block_keys(WEAK_JOKERS, WEAK_VOUCHERS) },
+    { label = "Money Maker", blocks = only_jokers(ECONOMY_JOKERS, { "economy" }) },
+    { label = "Mult Mayhem", blocks = only_jokers(MULT_JOKERS, { "mult", "xmult" }) },
+    { label = "Chip Stacker", blocks = only_jokers(CHIP_JOKERS, { "chips", "xchips" }) },
+    { label = "Showman's Circus", blocks = only_jokers(COPY_JOKERS, { "copying", "retrigger" }) },
+    { label = "Safe Spectrals", blocks = block_keys(RISKY_SPECTRALS) },
+    {
+        label = "Mega Packs Only",
+        blocks = function(center, pool_name)
+            return pool_name == "boosters"
+                and (center.key:find("_normal_", 1, true) ~= nil or has_any_attribute(center, { "normal" }))
+        end
+    },
+    {
+        label = "Buffoon Bonanza",
+        blocks = function(center, pool_name)
+            return pool_name == "boosters"
+                and center.kind ~= "Buffoon"
+                and not center.key:find("buffoon", 1, true)
+        end
+    },
+    {
+        label = "Vanilla Only",
+        blocks = function(center)
+            return center.mod ~= nil
+        end
+    }
+}
+
+local function builtin_blocklists(def)
+    local lists = {}
+    for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
+        lists[blocklist_key] = {}
+    end
+    for _, pool_name in ipairs(ShopCurator.categories) do
+        local blocklist_key = ShopCurator.pool_defs[pool_name].blocklist
+        for _, center in ipairs(ensure_pool(pool_name)) do
+            if def.blocks(center, pool_name) then
+                lists[blocklist_key][center.key] = true
+            end
+        end
+    end
+    return lists
+end
+
 local function sync_preset_label()
     local slot = ShopCurator.preset_slot
     local preset = config.presets[preset_key(slot)]
@@ -712,6 +873,8 @@ local function sync_preset_label()
     else
         ShopCurator.labels.preset = "Slot " .. slot .. ": empty"
     end
+    local builtin = BUILTIN_PRESETS[ShopCurator.builtin_index] or BUILTIN_PRESETS[1]
+    ShopCurator.labels.builtin = builtin.label
 end
 
 local function copy_blocklist(source)
@@ -829,16 +992,31 @@ G.FUNCS.shopcurator_preset_save = function(e)
     save_config()
 end
 
-G.FUNCS.shopcurator_preset_load = function(e)
-    local preset = config.presets[preset_key(ShopCurator.preset_slot)]
-    if not preset then
-        return
-    end
+local function apply_blocklists(lists)
     for _, blocklist_key in ipairs(BLOCKLIST_KEYS) do
-        config[blocklist_key] = copy_blocklist(preset[blocklist_key])
+        config[blocklist_key] = copy_blocklist(lists[blocklist_key])
     end
     refresh_rows()
     save_config()
+end
+
+G.FUNCS.shopcurator_preset_load = function(e)
+    local preset = config.presets[preset_key(ShopCurator.preset_slot)]
+    if preset then
+        apply_blocklists(preset)
+    end
+end
+
+G.FUNCS.shopcurator_builtin_select = function(e)
+    ShopCurator.builtin_index = ((ShopCurator.builtin_index + e.config.step - 1) % #BUILTIN_PRESETS) + 1
+    sync_preset_label()
+end
+
+G.FUNCS.shopcurator_builtin_load = function(e)
+    local def = BUILTIN_PRESETS[ShopCurator.builtin_index]
+    if def then
+        apply_blocklists(builtin_blocklists(def))
+    end
 end
 
 local function text_node(text, scale, colour)
@@ -921,20 +1099,20 @@ local function item_row(i)
     local row = ShopCurator.rows[i]
     return {
         n = G.UIT.R,
-        config = { align = "cm", padding = 0.015 },
+        config = { align = "cm", padding = 0.02 },
         nodes = {
             {
                 n = G.UIT.C,
-                config = { align = "cr", minw = 0.4 },
-                nodes = { ref_text_node(row, "number", 0.22, G.C.UI.TEXT_INACTIVE) }
+                config = { align = "cr", minw = 0.6, padding = 0.04 },
+                nodes = { ref_text_node(row, "number", 0.3, G.C.UI.TEXT_INACTIVE) }
             },
             {
                 n = G.UIT.C,
                 config = {
                     align = "cm",
-                    minw = 0.75,
-                    minh = 0.29,
-                    padding = 0.03,
+                    minw = 1.0,
+                    minh = 0.42,
+                    padding = 0.04,
                     r = 0.08,
                     hover = true,
                     shadow = true,
@@ -943,33 +1121,33 @@ local function item_row(i)
                     row = i,
                     tooltip = row.tooltip
                 },
-                nodes = { ref_text_node(row, "selected", 0.23) }
+                nodes = { ref_text_node(row, "selected", 0.32) }
             },
             {
                 n = G.UIT.C,
                 config = {
                     align = "cm",
-                    minw = 0.85,
-                    minh = 0.29,
-                    padding = 0.03,
+                    minw = 1.25,
+                    minh = 0.42,
+                    padding = 0.04,
                     r = 0.05,
                     colour = G.C.UI.BACKGROUND_INACTIVE,
                     tooltip = row.tooltip
                 },
-                nodes = { ref_text_node(row, "set", 0.21, G.C.UI.TEXT_LIGHT) }
+                nodes = { ref_text_node(row, "set", 0.29, G.C.UI.TEXT_LIGHT) }
             },
             {
                 n = G.UIT.C,
                 config = {
                     align = "cl",
-                    minw = 3.33,
-                    minh = 0.29,
-                    padding = 0.03,
+                    minw = 4.4,
+                    minh = 0.42,
+                    padding = 0.04,
                     r = 0.05,
                     colour = G.C.WHITE,
                     tooltip = row.tooltip
                 },
-                nodes = { ref_text_node(row, "name", 0.24, G.C.UI.TEXT_DARK) }
+                nodes = { ref_text_node(row, "name", 0.33, G.C.UI.TEXT_DARK) }
             }
         }
     }
@@ -983,7 +1161,7 @@ local function list_column(column)
     end
     return {
         n = G.UIT.C,
-        config = { align = "tm", padding = 0.035, minw = 5.45 },
+        config = { align = "tm", padding = 0.05, minw = 7.5 },
         nodes = rows
     }
 end
@@ -1097,12 +1275,12 @@ MOD.config_tab = function()
                             { n = G.UIT.B, config = { w = 0.12, h = 0.1 } },
                             button_node("All Off", "shopcurator_bulk", { available = false }, 1.05),
                             { n = G.UIT.B, config = { w = 0.6, h = 0.1 } },
-                            text_node("Preset", 0.22, G.C.UI.TEXT_INACTIVE),
+                            text_node("My presets", 0.22, G.C.UI.TEXT_INACTIVE),
                             { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
                             button_node("<", "shopcurator_preset_slot", { step = -1 }, 0.45),
                             {
                                 n = G.UIT.C,
-                                config = { align = "cm", minw = 2.0 },
+                                config = { align = "cm", minw = 2.6 },
                                 nodes = { ref_text_node(ShopCurator.labels, "preset", 0.24) }
                             },
                             button_node(">", "shopcurator_preset_slot", { step = 1 }, 0.45),
@@ -1110,6 +1288,23 @@ MOD.config_tab = function()
                             button_node("Save", "shopcurator_preset_save", { colour = G.C.BLUE }, 0.8),
                             { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
                             button_node("Load", "shopcurator_preset_load", { colour = G.C.BLUE }, 0.8)
+                        }
+                    },
+                    {
+                        n = G.UIT.R,
+                        config = { align = "cm", padding = 0.03 },
+                        nodes = {
+                            text_node("Ready-made", 0.22, G.C.UI.TEXT_INACTIVE),
+                            { n = G.UIT.B, config = { w = 0.08, h = 0.1 } },
+                            button_node("<", "shopcurator_builtin_select", { step = -1 }, 0.45),
+                            {
+                                n = G.UIT.C,
+                                config = { align = "cm", minw = 2.6 },
+                                nodes = { ref_text_node(ShopCurator.labels, "builtin", 0.24, G.C.ORANGE) }
+                            },
+                            button_node(">", "shopcurator_builtin_select", { step = 1 }, 0.45),
+                            { n = G.UIT.B, config = { w = 0.12, h = 0.1 } },
+                            button_node("Load", "shopcurator_builtin_load", { colour = G.C.BLUE }, 0.8)
                         }
                     },
                     {
