@@ -523,9 +523,12 @@ end
 local old_get_current_pool
 
 -- Rarities that can normally appear in the shop (weight above zero), plus
--- Legendary, which the base game keeps out of the shop.
+-- Legendary, which the base game keeps out of the shop. Steamodded's Joker
+-- rarity list never contains Legendary, so it is always added by hand.
 -- Rarity keys are passed as strings because Steamodded reads a number as a
 -- random roll (any whole number becomes Rare).
+local VANILLA_RARITY_NUMBERS = { Common = 1, Uncommon = 2, Rare = 3, Legendary = 4 }
+
 local function shop_joker_rarities()
     local rarities = {}
     local joker_type = SMODS and SMODS.ObjectTypes and SMODS.ObjectTypes.Joker
@@ -542,17 +545,24 @@ local function shop_joker_rarities()
                 end
             end
             local mod = G and G.GAME and G.GAME[tostring(rarity.key):lower() .. "_mod"] or 1
-            if rarity.key and (weight * mod > 0 or rarity.key == "Legendary") then
+            if rarity.key and rarity.key ~= "Legendary" and weight * mod > 0 then
                 rarities[#rarities + 1] = rarity.key
             end
         end
     end
 
     if #rarities == 0 then
-        rarities = { "Common", "Uncommon", "Rare", "Legendary" }
+        rarities = { "Common", "Uncommon", "Rare" }
     end
+    rarities[#rarities + 1] = "Legendary"
 
     return rarities
+end
+
+-- The game puts a stand-in card (plain Joker) into an empty rarity pool.
+-- Checking the rarity keeps that stand-in out of the combined pool.
+local function center_has_rarity(center, rarity)
+    return center.rarity == rarity or center.rarity == VANILLA_RARITY_NUMBERS[rarity]
 end
 
 local function unblocked_pool_entries(pool)
@@ -578,7 +588,7 @@ local function flat_joker_pool()
     for _, rarity in ipairs(shop_joker_rarities()) do
         local rarity_pool = old_get_current_pool("Joker", rarity, rarity == "Legendary", "shopcurator_flat")
         for _, key in ipairs(unblocked_pool_entries(rarity_pool)) do
-            if not seen[key] then
+            if not seen[key] and center_has_rarity(G.P_CENTERS[key], rarity) then
                 seen[key] = true
                 pool[#pool + 1] = key
             end
@@ -843,8 +853,11 @@ local BUILTIN_PRESETS = {
     },
     {
         label = "Vanilla Only",
+        -- A base-game card that another mod has adjusted still counts as
+        -- vanilla: Steamodded gives it a mod but no original_mod.
         blocks = function(center)
-            return center.mod ~= nil
+            return center.original_mod ~= nil
+                or (center.mod ~= nil and not center.taken_ownership)
         end
     }
 }
@@ -1351,10 +1364,34 @@ function get_next_voucher_key(...)
     return old_get_next_voucher_key(unpack(args))
 end
 
+-- The first shop of a run always offers a normal Buffoon pack, and the game
+-- picks between the two versions without checking both against the Off
+-- list. When exactly one of them is switched off, hand over the other.
+local FIRST_SHOP_BUFFOON_KEYS = { "p_buffoon_normal_1", "p_buffoon_normal_2" }
+
+local function only_allowed_first_buffoon()
+    if not (G and G.GAME and G.P_CENTERS) or G.GAME.first_shop_buffoon then
+        return nil
+    end
+    local allowed = {}
+    for _, key in ipairs(FIRST_SHOP_BUFFOON_KEYS) do
+        local center = G.P_CENTERS[key]
+        if center and not is_center_blocked(center) then
+            allowed[#allowed + 1] = center
+        end
+    end
+    return #allowed == 1 and allowed[1] or nil
+end
+
 local old_get_pack = get_pack
 function get_pack(_key, ...)
     local args = { ... }
-    if config.force_boosters and _key == "shop_pack" then
+    if config.enabled and config.force_boosters and _key == "shop_pack" then
+        local first_buffoon = only_allowed_first_buffoon()
+        if first_buffoon then
+            G.GAME.first_shop_buffoon = true
+            return first_buffoon
+        end
         return with_blocked_keys_banned("booster_blocklist", function()
             return old_get_pack(_key, unpack(args))
         end)

@@ -2,7 +2,7 @@
 
 Shop Curator is a Balatro mod for Steamodded that adds an in-game config menu for choosing which shop cards, vouchers, and booster packs are allowed to appear during a run.
 
-The mod keeps Balatro's normal shop randomness, but filters out anything you have turned off.
+Anything you turn off is filtered out of the shop and booster packs. Tarot, Planet, Spectral, voucher and booster odds stay as normal. Joker odds change: every enabled Joker gets an equal chance, and Legendary Jokers can appear in the shop (see [Joker Odds](#joker-odds)).
 
 ## Features
 
@@ -31,14 +31,14 @@ The mod keeps Balatro's normal shop randomness, but filters out anything you hav
 ## Installation
 
 1. Install Lovely and Steamodded for Balatro. https://github.com/Steamodded/smods/wiki/Installing-Steamodded-windows
-2. Download this repository.
-3. Copy the `ShopCurator` folder into your Balatro Mods folder:
+2. Download this repository (`Code` > `Download ZIP`) and unzip it.
+3. Copy the unzipped folder into your Balatro Mods folder:
 
 ```text
 %AppData%/Balatro/Mods
 ```
 
-Your final folder should look like:
+The folder name does not matter (you can rename it to `ShopCurator`), but the three mod files must sit directly inside it, not in a second nested folder:
 
 ```text
 %AppData%/Balatro/Mods/ShopCurator/ShopCurator.json
@@ -88,7 +88,7 @@ The slot label shows how many items that preset turns off.
 - `Safe Spectrals`: turns off Spectral cards that destroy cards, Jokers, money or hand size.
 - `Mega Packs Only`: turns off normal-size booster packs, leaving Jumbo and Mega.
 - `Buffoon Bonanza`: only Buffoon (Joker) packs.
-- `Vanilla Only`: turns off everything added by other mods.
+- `Vanilla Only`: turns off everything added by other mods. Base-game cards that another mod has tweaked stay on.
 
 Themed Joker presets include modded Jokers only when your Steamodded version tags them with a matching type. Small themed pools can run dry once you own every Joker in them; the shop then shows a plain Joker instead.
 
@@ -118,9 +118,11 @@ Balatro expects some generated pools to always produce a valid item. If every po
 
 For best results, leave at least one item enabled in each category you expect the game to generate.
 
+The first shop of a run always offers a normal Buffoon pack. If you turn off one of the two normal Buffoon packs, the other is offered instead; turn off both and the guaranteed pack is skipped.
+
 ## Version
 
-Current version: `0.6.0`
+Current version: `0.6.1`
 
 ## Author
 
